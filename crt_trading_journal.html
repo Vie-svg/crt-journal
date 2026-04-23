@@ -1,0 +1,477 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-sans, 'IBM Plex Mono', monospace); background: transparent; color: var(--color-text-primary); }
+  
+  .app { max-width: 100%; }
+  
+  .tabs { display: flex; gap: 2px; border-bottom: 0.5px solid var(--color-border-tertiary); margin-bottom: 1.5rem; }
+  .tab { padding: 8px 16px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; background: transparent; color: var(--color-text-secondary); border-bottom: 2px solid transparent; transition: all 0.15s; letter-spacing: 0.08em; text-transform: uppercase; }
+  .tab.active { color: var(--color-text-primary); border-bottom-color: #1D9E75; }
+  .tab:hover:not(.active) { color: var(--color-text-primary); }
+  
+  .panel { display: none; }
+  .panel.active { display: block; }
+  
+  /* JOURNAL PANEL */
+  .section-label { font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-secondary); margin-bottom: 8px; margin-top: 20px; }
+  .section-label:first-child { margin-top: 0; }
+  
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .field-full { margin-bottom: 10px; }
+  
+  label { font-size: 11px; color: var(--color-text-secondary); display: block; margin-bottom: 4px; }
+  input, select, textarea { width: 100%; padding: 7px 10px; font-size: 13px; font-family: inherit; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); color: var(--color-text-primary); }
+  textarea { resize: vertical; min-height: 64px; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #1D9E75; }
+  
+  .checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .check-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); cursor: pointer; transition: border-color 0.15s; }
+  .check-item.checked { border-color: #1D9E75; background: #E1F5EE22; }
+  .check-item input[type=checkbox] { width: auto; accent-color: #1D9E75; }
+  .check-item span { font-size: 12px; color: var(--color-text-secondary); flex: 1; }
+  .check-item.checked span { color: var(--color-text-primary); }
+  
+  .score-bar { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .score-track { flex: 1; height: 6px; background: var(--color-border-tertiary); border-radius: 3px; overflow: hidden; }
+  .score-fill { height: 100%; background: #1D9E75; border-radius: 3px; transition: width 0.3s; }
+  .score-fill.danger { background: #E24B4A; }
+  .score-fill.warn { background: #EF9F27; }
+  .score-num { font-size: 14px; font-weight: 500; min-width: 36px; text-align: right; }
+  
+  .verdict { padding: 10px 14px; border-radius: var(--border-radius-md); font-size: 12px; font-weight: 500; margin-top: 10px; text-align: center; letter-spacing: 0.06em; }
+  .verdict.go { background: #E1F5EE; color: #0F6E56; border: 0.5px solid #5DCAA5; }
+  .verdict.wait { background: #FAEEDA; color: #854F0B; border: 0.5px solid #EF9F27; }
+  .verdict.no { background: #FCEBEB; color: #A32D2D; border: 0.5px solid #F09595; }
+  
+  .emotion-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .emotion-btn { padding: 7px 4px; text-align: center; font-size: 11px; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); cursor: pointer; color: var(--color-text-secondary); transition: all 0.15s; }
+  .emotion-btn.sel { border-color: #1D9E75; color: #0F6E56; background: #E1F5EE22; font-weight: 500; }
+  
+  .outcome-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .outcome-btn { padding: 8px 6px; text-align: center; font-size: 11px; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); cursor: pointer; color: var(--color-text-secondary); transition: all 0.15s; }
+  .outcome-btn.win { border-color: #5DCAA5; color: #0F6E56; background: #E1F5EE22; font-weight: 500; }
+  .outcome-btn.loss { border-color: #F09595; color: #A32D2D; background: #FCEBEB22; font-weight: 500; }
+  .outcome-btn.be { border-color: #EF9F27; color: #854F0B; background: #FAEEDA22; font-weight: 500; }
+  .outcome-btn.skip { border-color: #888780; color: #5F5E5A; background: transparent; font-weight: 500; }
+
+  .btn-primary { width: 100%; padding: 10px; background: #0F6E56; color: #9FE1CB; font-size: 13px; font-weight: 500; border: none; border-radius: var(--border-radius-md); cursor: pointer; margin-top: 16px; letter-spacing: 0.04em; transition: opacity 0.15s; font-family: inherit; }
+  .btn-primary:hover { opacity: 0.85; }
+  
+  /* LOG TABLE */
+  .log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .log-count { font-size: 12px; color: var(--color-text-secondary); }
+  
+  .trade-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .trade-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-secondary); padding: 6px 8px; text-align: left; border-bottom: 0.5px solid var(--color-border-tertiary); font-weight: 500; }
+  .trade-table td { padding: 8px 8px; border-bottom: 0.5px solid var(--color-border-tertiary); vertical-align: middle; }
+  .trade-table tr:last-child td { border-bottom: none; }
+  
+  .tag { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 500; letter-spacing: 0.04em; }
+  .tag-win { background: #E1F5EE; color: #0F6E56; }
+  .tag-loss { background: #FCEBEB; color: #A32D2D; }
+  .tag-be { background: #FAEEDA; color: #854F0B; }
+  .tag-skip { background: var(--color-background-secondary); color: var(--color-text-secondary); }
+  
+  .model-tag { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 10px; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); color: var(--color-text-secondary); }
+  
+  .r-pos { color: #1D9E75; font-weight: 500; }
+  .r-neg { color: #E24B4A; font-weight: 500; }
+  .r-zero { color: var(--color-text-secondary); }
+  
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--color-text-secondary); font-size: 13px; }
+  
+  /* STATS */
+  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+  .stat-card { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 14px; }
+  .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-secondary); margin-bottom: 6px; }
+  .stat-val { font-size: 22px; font-weight: 500; }
+  .stat-val.pos { color: #1D9E75; }
+  .stat-val.neg { color: #E24B4A; }
+  .stat-val.neutral { color: var(--color-text-primary); }
+  
+  .rules-section { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 14px; }
+  .rule-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 12px; }
+  .rule-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .rule-num { font-weight: 500; color: #1D9E75; min-width: 20px; }
+  .rule-text { color: var(--color-text-secondary); line-height: 1.5; }
+  .rule-violated { color: #E24B4A; font-size: 11px; margin-top: 2px; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('entry')">Saisie trade</button>
+    <button class="tab" onclick="switchTab('log')">Historique</button>
+    <button class="tab" onclick="switchTab('stats')">Performance</button>
+    <button class="tab" onclick="switchTab('rules')">Règles CRT</button>
+  </div>
+
+  <!-- ENTRY PANEL -->
+  <div id="panel-entry" class="panel active">
+    <div class="section-label">Contexte du trade</div>
+    <div class="field-row">
+      <div><label>Date</label><input type="date" id="t-date" /></div>
+      <div><label>Instrument</label>
+        <select id="t-pair">
+          <option>Volatility 25 Index</option>
+          <option>Volatility 10 Index</option>
+          <option>EURUSD</option>
+          <option>Autre</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row-3">
+      <div><label>Session</label>
+        <select id="t-session">
+          <option>London</option>
+          <option>New York</option>
+          <option>Asian</option>
+          <option>5PM NY</option>
+        </select>
+      </div>
+      <div><label>Timeframe HTF</label>
+        <select id="t-htf">
+          <option>H4</option>
+          <option>Daily</option>
+          <option>Weekly</option>
+        </select>
+      </div>
+      <div><label>Biais</label>
+        <select id="t-bias">
+          <option>Haussier</option>
+          <option>Baissier</option>
+          <option>Neutre</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section-label">Modèle CRT</div>
+    <div class="field-row">
+      <div><label>Modèle d'entrée</label>
+        <select id="t-model">
+          <option>Model #1 (C3 direct)</option>
+          <option>Kiss of Death (KOD)</option>
+          <option>C3 Direct sans pullback</option>
+          <option>Aucun — trade ignoré</option>
+        </select>
+      </div>
+      <div><label>Phase identifiée</label>
+        <select id="t-phase">
+          <option>C2 terminé → C3 attendu</option>
+          <option>C3 en cours</option>
+          <option>C1 en accumulation</option>
+          <option>Ambigu</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section-label">Checklist pré-trade (min. 7/10)</div>
+    <div class="checklist" id="checklist">
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox" /><span>C1 clair identifié</span></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox" /><span>C2 Turtle Soup validé</span></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox" /><span>Close C3 confirmée</span></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox" /><span>Key Level présent</span></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox" /><span>SMT divergence</span></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox" /><span>Killzone active</span></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox" /><span>Séquence 1-5-9</span></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox" /><span>HTF aligné</span></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox" /><span>SL au-delà Turtle Soup</span></div>
+      <div class="check-item" onclick="toggleCheck(this)"><input type="checkbox" /><span>R:R minimum 1:2</span></div>
+    </div>
+    <div class="score-bar">
+      <div class="score-track"><div class="score-fill" id="score-fill" style="width:0%"></div></div>
+      <span class="score-num" id="score-num">0/10</span>
+    </div>
+    <div class="verdict no" id="verdict">TRADE INVALIDE — Confluence insuffisante</div>
+
+    <div class="section-label">Niveaux</div>
+    <div class="field-row-3">
+      <div><label>Entrée</label><input type="number" id="t-entry" placeholder="0.00000" step="0.00001" /></div>
+      <div><label>Stop Loss</label><input type="number" id="t-sl" placeholder="0.00000" step="0.00001" /></div>
+      <div><label>TP1 (50% C1)</label><input type="number" id="t-tp1" placeholder="0.00000" step="0.00001" /></div>
+    </div>
+    <div class="field-row">
+      <div><label>TP2 (High/Low C1)</label><input type="number" id="t-tp2" placeholder="0.00000" step="0.00001" /></div>
+      <div><label>Taille position (%)</label><input type="number" id="t-risk" placeholder="0.5" step="0.1" max="1" /></div>
+    </div>
+
+    <div class="section-label">État émotionnel avant trade</div>
+    <div class="emotion-grid" id="emotions-before">
+      <div class="emotion-btn" onclick="selectEmotion(this,'before')">Calme</div>
+      <div class="emotion-btn" onclick="selectEmotion(this,'before')">Concentré</div>
+      <div class="emotion-btn" onclick="selectEmotion(this,'before')">Impatient</div>
+      <div class="emotion-btn" onclick="selectEmotion(this,'before')">FOMO</div>
+      <div class="emotion-btn" onclick="selectEmotion(this,'before')">Revanche</div>
+      <div class="emotion-btn" onclick="selectEmotion(this,'before')">Incertain</div>
+      <div class="emotion-btn" onclick="selectEmotion(this,'before')">Surconfiant</div>
+      <div class="emotion-btn" onclick="selectEmotion(this,'before')">Anxieux</div>
+    </div>
+
+    <div class="section-label">Notes pré-trade</div>
+    <div class="field-full"><textarea id="t-notes-pre" placeholder="Contexte HTF, raison du setup, ce que tu attends..."></textarea></div>
+
+    <div class="section-label">Résultat (après clôture)</div>
+    <div class="outcome-row" id="outcome-row">
+      <div class="outcome-btn win" onclick="selectOutcome(this,'WIN')">WIN</div>
+      <div class="outcome-btn loss" onclick="selectOutcome(this,'LOSS')">LOSS</div>
+      <div class="outcome-btn be" onclick="selectOutcome(this,'BE')">BE</div>
+      <div class="outcome-btn skip" onclick="selectOutcome(this,'SKIP')">IGNORÉ</div>
+    </div>
+
+    <div class="field-row" id="result-fields" style="display:none">
+      <div><label>R réalisé</label><input type="number" id="t-r" placeholder="+2.0" step="0.1" /></div>
+      <div><label>TP atteint</label>
+        <select id="t-tp-hit">
+          <option>TP1 (50%)</option>
+          <option>TP2</option>
+          <option>TP3</option>
+          <option>SL touché</option>
+          <option>Fermé manuellement</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section-label" id="after-label" style="display:none">État émotionnel après</div>
+    <div class="emotion-grid" id="emotions-after" style="display:none">
+      <div class="emotion-btn" onclick="selectEmotion(this,'after')">Satisfait</div>
+      <div class="emotion-btn" onclick="selectEmotion(this,'after')">Frustré</div>
+      <div class="emotion-btn" onclick="selectEmotion(this,'after')">Neutre</div>
+      <div class="emotion-btn" onclick="selectEmotion(this,'after')">Revanche</div>
+      <div class="emotion-btn" onclick="selectEmotion(this,'after')">Soulagé</div>
+      <div class="emotion-btn" onclick="selectEmotion(this,'after')">Regret</div>
+      <div class="emotion-btn" onclick="selectEmotion(this,'after')">Confiant</div>
+      <div class="emotion-btn" onclick="selectEmotion(this,'after')">Dispersé</div>
+    </div>
+
+    <div class="section-label">Post-mortem</div>
+    <div class="field-full"><textarea id="t-notes-post" placeholder="Ce qui s'est passé. Erreur commise ? Règle violée ? Leçon retenue."></textarea></div>
+
+    <button class="btn-primary" onclick="saveTrade()">Enregistrer le trade</button>
+  </div>
+
+  <!-- LOG PANEL -->
+  <div id="panel-log" class="panel">
+    <div class="log-header">
+      <div class="section-label" style="margin:0">Trades enregistrés</div>
+      <span class="log-count" id="log-count">0 trade(s)</span>
+    </div>
+    <table class="trade-table" id="log-table">
+      <thead><tr>
+        <th>Date</th>
+        <th>Instrument</th>
+        <th>Modèle</th>
+        <th>Score</th>
+        <th>Résultat</th>
+        <th>R</th>
+      </tr></thead>
+      <tbody id="log-body"></tbody>
+    </table>
+    <div class="empty-state" id="log-empty">Aucun trade enregistré.</div>
+  </div>
+
+  <!-- STATS PANEL -->
+  <div id="panel-stats" class="panel">
+    <div class="section-label">Vue performance</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Trades totaux</div><div class="stat-val neutral" id="s-total">0</div></div>
+      <div class="stat-card"><div class="stat-label">Win rate</div><div class="stat-val neutral" id="s-wr">—</div></div>
+      <div class="stat-card"><div class="stat-label">R total</div><div class="stat-val neutral" id="s-r">0.0R</div></div>
+      <div class="stat-card"><div class="stat-label">Moy. score checklist</div><div class="stat-val neutral" id="s-score">—</div></div>
+      <div class="stat-card"><div class="stat-label">Trades sous 7/10</div><div class="stat-val neutral" id="s-bad">0</div></div>
+      <div class="stat-card"><div class="stat-label">Trades ignorés</div><div class="stat-val neutral" id="s-skip">0</div></div>
+    </div>
+    <div class="section-label">Modèles utilisés</div>
+    <div id="s-models" class="rules-section" style="font-size:13px; color: var(--color-text-secondary);">—</div>
+  </div>
+
+  <!-- RULES PANEL -->
+  <div id="panel-rules" class="panel">
+    <div class="section-label">Règles absolues CRT</div>
+    <div class="rules-section">
+      <div class="rule-row"><span class="rule-num">01</span><span class="rule-text">Jamais d'entrée sans confirmation de close de bougie C3</span></div>
+      <div class="rule-row"><span class="rule-num">02</span><span class="rule-text">Setup sans Key Level = invalide. Un FVG ou HOD/LOD doit être présent</span></div>
+      <div class="rule-row"><span class="rule-num">03</span><span class="rule-text">Stop Loss placé au-delà du point Turtle Soup, jamais dans le corps de C2</span></div>
+      <div class="rule-row"><span class="rule-num">04</span><span class="rule-text">TP1 à 50% de C1 est obligatoire. Ne jamais viser directement TP3 sans avoir sécurisé TP1</span></div>
+      <div class="rule-row"><span class="rule-num">05</span><span class="rule-text">Risque maximum par trade : 0.5–1% du capital. Non-négociable</span></div>
+      <div class="rule-row"><span class="rule-num">06</span><span class="rule-text">R:R minimum 1:2 avant d'ouvrir une position</span></div>
+      <div class="rule-row"><span class="rule-num">07</span><span class="rule-text">Checklist minimum 7/10. En dessous → pas de trade, aucune exception</span></div>
+      <div class="rule-row"><span class="rule-num">08</span><span class="rule-text">SMT est un filtre de confirmation, pas un signal d'entrée seul</span></div>
+      <div class="rule-row"><span class="rule-num">09</span><span class="rule-text">KOD privilégié sur C3 direct quand disponible. Ne pas chasser la continuation</span></div>
+      <div class="rule-row"><span class="rule-num">10</span><span class="rule-text">3 erreurs fatales : surrisque, revenge trading, ignorer la checklist</span></div>
+    </div>
+    <div class="section-label" style="margin-top:16px">Séquence d'analyse obligatoire</div>
+    <div class="rules-section">
+      <div class="rule-row"><span class="rule-num">H4</span><span class="rule-text">Biais HTF — structure générale, tendance, C1/C2/C3 macro</span></div>
+      <div class="rule-row"><span class="rule-num">H1</span><span class="rule-text">Confirmation — C3 en cours, Key Level actif, comportement de prix</span></div>
+      <div class="rule-row"><span class="rule-num">M15</span><span class="rule-text">Timing d'entrée — close de bougie, killzone active, séquence 1-5-9</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let trades = [];
+let selectedOutcome = null;
+let selectedEmotionBefore = null;
+let selectedEmotionAfter = null;
+let checkCount = 0;
+
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('panel-'+id).classList.add('active');
+  if(id==='log') renderLog();
+  if(id==='stats') renderStats();
+}
+
+function toggleCheck(el) {
+  el.classList.toggle('checked');
+  el.querySelector('input').checked = el.classList.contains('checked');
+  checkCount = document.querySelectorAll('.check-item.checked').length;
+  updateScore();
+}
+
+function updateScore() {
+  const pct = (checkCount/10)*100;
+  const fill = document.getElementById('score-fill');
+  fill.style.width = pct+'%';
+  fill.className = 'score-fill' + (checkCount < 5 ? ' danger' : checkCount < 7 ? ' warn' : '');
+  document.getElementById('score-num').textContent = checkCount+'/10';
+  const v = document.getElementById('verdict');
+  if(checkCount >= 7) { v.className='verdict go'; v.textContent='TRADE VALIDE — Confluence suffisante ('+checkCount+'/10)'; }
+  else if(checkCount >= 5) { v.className='verdict wait'; v.textContent='ATTENDRE — Confluence faible ('+checkCount+'/10)'; }
+  else { v.className='verdict no'; v.textContent='TRADE INVALIDE — Confluence insuffisante ('+checkCount+'/10)'; }
+}
+
+function selectEmotion(el, type) {
+  const parent = type==='before' ? document.getElementById('emotions-before') : document.getElementById('emotions-after');
+  parent.querySelectorAll('.emotion-btn').forEach(b => b.classList.remove('sel'));
+  el.classList.add('sel');
+  if(type==='before') selectedEmotionBefore = el.textContent;
+  else selectedEmotionAfter = el.textContent;
+}
+
+function selectOutcome(el, val) {
+  document.querySelectorAll('#outcome-row .outcome-btn').forEach(b => b.style.opacity='0.4');
+  el.style.opacity='1';
+  selectedOutcome = val;
+  const show = val !== 'SKIP';
+  document.getElementById('result-fields').style.display = show ? 'grid' : 'none';
+  document.getElementById('after-label').style.display = show ? 'block' : 'none';
+  document.getElementById('emotions-after').style.display = show ? 'grid' : 'none';
+}
+
+function saveTrade() {
+  const date = document.getElementById('t-date').value;
+  if(!date) { alert('Date requise'); return; }
+  if(!selectedOutcome) { alert('Sélectionner un résultat'); return; }
+  
+  const trade = {
+    id: Date.now(),
+    date,
+    pair: document.getElementById('t-pair').value,
+    session: document.getElementById('t-session').value,
+    htf: document.getElementById('t-htf').value,
+    bias: document.getElementById('t-bias').value,
+    model: document.getElementById('t-model').value,
+    phase: document.getElementById('t-phase').value,
+    score: checkCount,
+    entry: document.getElementById('t-entry').value,
+    sl: document.getElementById('t-sl').value,
+    tp1: document.getElementById('t-tp1').value,
+    tp2: document.getElementById('t-tp2').value,
+    risk: document.getElementById('t-risk').value,
+    outcome: selectedOutcome,
+    r: parseFloat(document.getElementById('t-r').value)||0,
+    tpHit: document.getElementById('t-tp-hit').value,
+    emotionBefore: selectedEmotionBefore||'—',
+    emotionAfter: selectedEmotionAfter||'—',
+    notesPre: document.getElementById('t-notes-pre').value,
+    notesPost: document.getElementById('t-notes-post').value,
+  };
+  trades.push(trade);
+  
+  resetForm();
+  switchTab('log');
+  document.querySelectorAll('.tab')[1].click();
+}
+
+function resetForm() {
+  document.getElementById('t-date').value='';
+  document.getElementById('t-entry').value='';
+  document.getElementById('t-sl').value='';
+  document.getElementById('t-tp1').value='';
+  document.getElementById('t-tp2').value='';
+  document.getElementById('t-risk').value='';
+  document.getElementById('t-r').value='';
+  document.getElementById('t-notes-pre').value='';
+  document.getElementById('t-notes-post').value='';
+  document.querySelectorAll('.check-item').forEach(el=>{ el.classList.remove('checked'); el.querySelector('input').checked=false; });
+  document.querySelectorAll('#outcome-row .outcome-btn').forEach(b=>b.style.opacity='1');
+  document.querySelectorAll('.emotion-btn').forEach(b=>b.classList.remove('sel'));
+  selectedOutcome=null; selectedEmotionBefore=null; selectedEmotionAfter=null; checkCount=0;
+  updateScore();
+  document.getElementById('result-fields').style.display='none';
+  document.getElementById('after-label').style.display='none';
+  document.getElementById('emotions-after').style.display='none';
+}
+
+function renderLog() {
+  const body = document.getElementById('log-body');
+  const empty = document.getElementById('log-empty');
+  document.getElementById('log-count').textContent = trades.length+' trade(s)';
+  if(!trades.length){ body.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  body.innerHTML = trades.slice().reverse().map(t=>{
+    const tagClass = t.outcome==='WIN'?'tag-win':t.outcome==='LOSS'?'tag-loss':t.outcome==='BE'?'tag-be':'tag-skip';
+    const rClass = t.r>0?'r-pos':t.r<0?'r-neg':'r-zero';
+    const rVal = t.outcome==='SKIP'?'—':(t.r>0?'+':'')+t.r.toFixed(1)+'R';
+    const modelShort = t.model.includes('KOD')?'KOD':t.model.includes('#1')?'Model #1':'C3 Direct';
+    return `<tr>
+      <td style="font-size:11px;color:var(--color-text-secondary)">${t.date}</td>
+      <td style="font-size:11px">${t.pair}</td>
+      <td><span class="model-tag">${modelShort}</span></td>
+      <td style="font-size:12px;font-weight:500;color:${t.score>=7?'#1D9E75':t.score>=5?'#EF9F27':'#E24B4A'}">${t.score}/10</td>
+      <td><span class="tag ${tagClass}">${t.outcome}</span></td>
+      <td class="${rClass}">${rVal}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderStats() {
+  if(!trades.length){ return; }
+  const closed = trades.filter(t=>t.outcome!=='SKIP');
+  const wins = trades.filter(t=>t.outcome==='WIN');
+  const losses = trades.filter(t=>t.outcome==='LOSS');
+  const skips = trades.filter(t=>t.outcome==='SKIP');
+  const totalR = closed.reduce((s,t)=>s+t.r,0);
+  const wr = closed.length ? Math.round((wins.length/closed.length)*100) : 0;
+  const avgScore = trades.length ? (trades.reduce((s,t)=>s+t.score,0)/trades.length).toFixed(1) : '—';
+  const badTrades = trades.filter(t=>t.score<7).length;
+  
+  document.getElementById('s-total').textContent = trades.length;
+  const wrEl = document.getElementById('s-wr');
+  wrEl.textContent = closed.length ? wr+'%' : '—';
+  wrEl.className = 'stat-val '+(wr>=50?'pos':'neg');
+  const rEl = document.getElementById('s-r');
+  rEl.textContent = (totalR>=0?'+':'')+totalR.toFixed(1)+'R';
+  rEl.className = 'stat-val '+(totalR>0?'pos':totalR<0?'neg':'neutral');
+  document.getElementById('s-score').textContent = avgScore+'/10';
+  document.getElementById('s-bad').textContent = badTrades;
+  document.getElementById('s-skip').textContent = skips.length;
+  
+  const modelCounts = {};
+  trades.forEach(t=>{ const m = t.model; modelCounts[m]=(modelCounts[m]||0)+1; });
+  document.getElementById('s-models').innerHTML = Object.entries(modelCounts).map(([m,c])=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:12px"><span style="color:var(--color-text-secondary)">${m}</span><span style="font-weight:500">${c} trade(s)</span></div>`).join('');
+}
+
+document.getElementById('t-date').valueAsDate = new Date();
+updateScore();
+</script>
+</body>
+</html>
